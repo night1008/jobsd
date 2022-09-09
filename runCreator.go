@@ -67,6 +67,14 @@ func (r *RunOnceCreator) RetriesErrorLimit(limit int) *RunOnceCreator {
 	return r
 }
 
+func (r *RunOnceCreator) WithAppID(appID int64) *RunOnceCreator {
+	if r.done {
+		return r
+	}
+	r.jobRun.AppID = appID
+	return r
+}
+
 // Run the job
 // returns the Job Run ID and Error
 func (r *RunOnceCreator) Run() (int64, error) {
@@ -168,6 +176,14 @@ func (r *RunScheduleCreator) Limit(limit int) *RunScheduleCreator {
 		return r
 	}
 	r.jobRun.RunSuccessLimit = sql.NullInt64{Valid: true, Int64: int64(limit)}
+	return r
+}
+
+func (r *RunScheduleCreator) WithAppID(appID int64) *RunScheduleCreator {
+	if r.done {
+		return r
+	}
+	r.jobRun.AppID = appID
 	return r
 }
 

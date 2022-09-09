@@ -15,6 +15,7 @@ import (
 type Run struct {
 	ID                    int64 `gorm:"primaryKey"`
 	OriginID              int64 `gorm:"index"`
+	AppID                 int64 `gorm:"index"`
 	Name                  string
 	NameActive            sql.NullString `gorm:"unique"`
 	Job                   string
@@ -147,6 +148,7 @@ func (j *Run) resetTimeoutRetries() {
 func (j *Run) cloneReset(instanceID int64) Run {
 	return Run{
 		OriginID:              j.ID,
+		AppID:                 j.AppID,
 		Name:                  j.Name,
 		NameActive:            sql.NullString{Valid: true, String: j.Name},
 		Job:                   j.Job,
