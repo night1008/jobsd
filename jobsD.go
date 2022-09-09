@@ -69,6 +69,7 @@ type JobsD struct {
 	adderCtxCancelFunc    context.CancelFunc
 	addertCxCancelWait    sync.WaitGroup
 	db                    *gorm.DB
+	timeLocation          *time.Location
 }
 
 // RegisterJob registers a job to be run when required.
@@ -256,7 +257,7 @@ func (j *JobsD) runnableDelegator(done <-chan struct{}) {
 	var waitTime time.Duration
 	for {
 		waitTime = time.Second * 5
-		now := time.Now()
+		now := time.Now().In(j.GetTimeLocation())
 
 		if j.runQ.Len() > 0 {
 			nextRunAt := j.runQ.Peek().runAt()
@@ -345,7 +346,7 @@ func (j *JobsD) runnableResurrector(done <-chan struct{}) {
 		jobRuns := []Run{}
 		j.db.Where(
 			"run_started_at IS NOT NULL AND run_completed_at IS NULL AND run_timeout_at <= ? AND created_by <> ?",
-			time.Now(), j.instance.ID,
+			time.Now().In(j.GetTimeLocation()), j.instance.ID,
 		).Limit(j.instance.PollLimit).Find(&jobRuns)
 
 		if len(jobRuns) > 0 {
@@ -407,7 +408,7 @@ func (j *JobsD) updateInstance() error {
 	j.instanceMu.Lock()
 	defer j.instanceMu.Unlock()
 
-	j.instance.LastSeenAt = sql.NullTime{Valid: true, Time: time.Now()}
+	j.instance.LastSeenAt = sql.NullTime{Valid: true, Time: time.Now().In(j.GetTimeLocation())}
 
 	// To avoid a race we clone it to update
 	toSave := j.instance
@@ -500,7 +501,7 @@ func (j *JobsD) createRunnable(jr Run) (rtn *Runnable, err error) {
 // CreateRun . Create a job run.
 func (j *JobsD) CreateRun(job string, jobParams ...interface{}) *RunOnceCreator {
 	name := uuid.Must(uuid.NewUUID()).String() // We die here if time fails.
-	now := time.Now()
+	now := time.Now().In(j.GetTimeLocation())
 	jr := Run{
 		Name:            name,
 		NameActive:      sql.NullString{Valid: true, String: name},
@@ -652,4 +653,16 @@ func New(db *gorm.DB) *JobsD {
 	rtn.Logger(logc.NewLogrus(logrus.New()))
 
 	return rtn
+}
+
+func (j *JobsD) WithTimeLocation(location *time.Location) *JobsD {
+	j.timeLocation = location
+	return j
+}
+
+func (j *JobsD) GetTimeLocation() *time.Location {
+	if j.timeLocation != nil {
+		return j.timeLocation
+	}
+	return time.Now().Location()
 }

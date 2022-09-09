@@ -30,7 +30,7 @@ func (r *Runnable) runAt() time.Time {
 }
 
 func (r *Runnable) schedule() {
-	r.jobRun.RunAt = time.Now().Add(r.jobRun.Delay)
+	r.jobRun.RunAt = time.Now().In(r.jobRun.RunAt.Location()).Add(r.jobRun.Delay)
 	if r.jobSchedule != nil && r.jobRun.needsScheduling() {
 		r.jobRun.RunAt = (*r.jobSchedule)(r.jobRun.RunAt)
 	}
@@ -109,7 +109,7 @@ func (r *Runnable) exec() (rtn error) {
 	}()
 
 	if r.jobRun.RunTimeoutAt.Valid {
-		timeOut := time.NewTimer(r.jobRun.RunTimeoutAt.Time.Sub(time.Now()))
+		timeOut := time.NewTimer(r.jobRun.RunTimeoutAt.Time.Sub(time.Now().In(r.jobRun.RunAt.Location())))
 		cleanTimer := func() {
 			if !timeOut.Stop() { // clean up timer
 				<-timeOut.C

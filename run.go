@@ -61,7 +61,7 @@ func (j *Run) insertGet(db *gorm.DB) error {
 
 // lock the job to run
 func (j *Run) lock(db *gorm.DB, instanceID int64) (bool, error) {
-	startedAt := time.Now()
+	startedAt := time.Now().In(j.RunAt.Location())
 	runTimeoutAt := startedAt.Add(time.Duration(j.RunTimeout.Int64))
 	tx := db.Model(j).Where("run_started_at IS NULL").Updates(map[string]interface{}{
 		"run_timeout_at": runTimeoutAt,
@@ -93,7 +93,7 @@ func (j *Run) markComplete(db *gorm.DB, instanceID int64, jobRunErr error) error
 	} else {
 		j.RunSuccessCount++
 	}
-	j.RunCompletedAt = sql.NullTime{Valid: true, Time: time.Now()}
+	j.RunCompletedAt = sql.NullTime{Valid: true, Time: time.Now().In(j.RunAt.Location())}
 
 	tx := db.Model(j).Where("run_completed_at IS NULL").Updates(map[string]interface{}{
 		"name_active":         j.NameActive,
@@ -110,7 +110,7 @@ func (j *Run) markComplete(db *gorm.DB, instanceID int64, jobRunErr error) error
 }
 
 func (j *Run) hasTimedOut() bool {
-	return j.RunTimeoutAt.Valid && j.RunTimeoutAt.Time.After(time.Now())
+	return j.RunTimeoutAt.Valid && j.RunTimeoutAt.Time.After(time.Now().In(j.RunAt.Location()))
 }
 
 func (j *Run) hasCompleted() bool {
@@ -153,14 +153,14 @@ func (j *Run) cloneReset(instanceID int64) Run {
 		JobArgs:               j.JobArgs,
 		RunSuccessCount:       j.RunSuccessCount,
 		RunSuccessLimit:       j.RunSuccessLimit,
-		RunAt:                 time.Now(),
+		RunAt:                 time.Now().In(j.RunAt.Location()),
 		RunTimeout:            j.RunTimeout,
 		RetriesOnErrorCount:   j.RetriesOnErrorCount,
 		RetriesOnErrorLimit:   j.RetriesOnErrorLimit,
 		RetriesOnTimeoutCount: j.RetriesOnTimeoutCount,
 		RetriesOnTimeoutLimit: j.RetriesOnTimeoutLimit,
 		Schedule:              j.Schedule,
-		CreatedAt:             time.Now(),
+		CreatedAt:             time.Now().In(j.RunAt.Location()),
 		CreatedBy:             instanceID,
 	}
 }
