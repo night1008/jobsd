@@ -70,6 +70,7 @@ type JobsD struct {
 	addertCxCancelWait    sync.WaitGroup
 	db                    *gorm.DB
 	timeLocation          *time.Location
+	scheduleParser        ScheduleParser
 }
 
 // RegisterJob registers a job to be run when required.
@@ -458,11 +459,17 @@ func (j *JobsD) buildRunnable(jr Run) (rtn *Runnable, err error) {
 
 	var scheduleFunc *ScheduleFunc
 	if jr.needsScheduling() {
-		s, exists := j.schedules[jr.Schedule.String]
-		if !exists {
-			return rtn, errors.New("cannot schedule job. schedule '" + jr.Schedule.String + "' missing")
+		sc, err := j.scheduleParser.Parse(jr.Schedule.String)
+		if err == nil {
+			scheduleFuncConvert := ScheduleFunc(sc.Next)
+			scheduleFunc = &scheduleFuncConvert
+		} else {
+			s, exists := j.schedules[jr.Schedule.String]
+			if !exists {
+				return rtn, errors.New("cannot schedule job. schedule '" + jr.Schedule.String + "' missing")
+			}
+			scheduleFunc = &s
 		}
-		scheduleFunc = &s
 	}
 
 	return newRunnable(
@@ -644,10 +651,11 @@ func New(db *gorm.DB) *JobsD {
 			RetriesOnTimeoutLimit: sql.NullInt64{Valid: true, Int64: 3},
 			RetriesOnErrorLimit:   sql.NullInt64{Valid: true, Int64: 3},
 		},
-		jobs:      map[string]*JobContainer{},
-		schedules: map[string]ScheduleFunc{},
-		runQ:      NewRunnableQueue(),
-		db:        tx,
+		jobs:           map[string]*JobContainer{},
+		schedules:      map[string]ScheduleFunc{},
+		runQ:           NewRunnableQueue(),
+		db:             tx,
+		scheduleParser: standardParser,
 	}
 
 	rtn.Logger(logc.NewLogrus(logrus.New()))
@@ -665,4 +673,13 @@ func (j *JobsD) GetTimeLocation() *time.Location {
 		return j.timeLocation
 	}
 	return time.Now().Location()
+}
+
+func (j *JobsD) WithScheduleParser(parser ScheduleParser) *JobsD {
+	j.scheduleParser = parser
+	return j
+}
+
+func (j *JobsD) GetScheduleParser() ScheduleParser {
+	return j.scheduleParser
 }

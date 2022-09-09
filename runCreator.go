@@ -195,6 +195,9 @@ func (r *RunScheduleCreator) Run() (int64, error) {
 	}
 	r.done = true
 	jr, err := r.jobsd.createRunnable(r.jobRun)
+	if jr == nil || jr.jobRun == nil {
+		return 0, err
+	}
 	return jr.jobRun.ID, err
 }
 
